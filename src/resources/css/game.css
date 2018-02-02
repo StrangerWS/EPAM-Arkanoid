@@ -1,0 +1,10 @@
+#windowGame {
+    -fx-border-width: 2px;
+    -fx-border-color: black;
+    -fx-border-style: solid;
+    -fx-background-color: yellowgreen;
+}
+
+#windowMain {
+    -fx-background-color: gray;
+}
