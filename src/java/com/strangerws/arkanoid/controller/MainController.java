@@ -4,10 +4,15 @@ import com.strangerws.arkanoid.model.Ball;
 import com.strangerws.arkanoid.model.Counter;
 import com.strangerws.arkanoid.model.Plane;
 import com.strangerws.arkanoid.model.Render;
+import javafx.beans.property.ObjectProperty;
+import javafx.beans.property.SimpleObjectProperty;
+import javafx.event.EventHandler;
 import javafx.fxml.FXML;
+import javafx.geometry.Point2D;
 import javafx.scene.canvas.Canvas;
 import javafx.scene.canvas.GraphicsContext;
 import javafx.scene.control.Button;
+import javafx.scene.input.MouseEvent;
 import javafx.scene.layout.Pane;
 import javafx.scene.paint.Color;
 
@@ -33,7 +38,9 @@ public class MainController {
     public void startGame() {
         isPlaying = true;
         balls = new Ball[lives];
-        Plane plane = new Plane(ballSpawnX - 25, ballSpawnY + 16);
+        Plane plane = new Plane(ballSpawnX - 25, ballSpawnY + 12, 50, 8);
+
+        setPlaneControls(plane);
 
         canvas = new Canvas(windowGame.getWidth(), windowGame.getHeight());
         gc = canvas.getGraphicsContext2D();
@@ -46,9 +53,29 @@ public class MainController {
 
         gc.clearRect(0, 0, windowGame.getWidth(), windowGame.getHeight());
         gc.setFill(Color.YELLOWGREEN);
-        Thread gameThread = new Thread(new Render(balls[lives - 1], new Counter(), plane, gc));
+        Thread gameThread = new Thread(new Render(balls[lives - 1], new Counter(), gc));
         gameThread.start();
 
+    }
+
+    private void setPlaneControls(Plane plane) {
+        final ObjectProperty<Point2D> mousePosition = new SimpleObjectProperty<>();
+
+        plane.setOnMousePressed(new EventHandler<MouseEvent>() {
+            @Override
+            public void handle(MouseEvent event) {
+                mousePosition.set(new Point2D(event.getSceneX(), event.getSceneY()));
+            }
+        });
+
+        plane.setOnMouseDragged(new EventHandler<MouseEvent>() {
+            @Override
+            public void handle(MouseEvent event) {
+                double deltaX = event.getSceneX() - mousePosition.get().getX();
+                plane.movePlane(plane.getLayoutX() + deltaX, windowGame.getWidth());
+                mousePosition.set(new Point2D(event.getSceneX(), event.getSceneY()));
+            }
+        });
     }
 
 }
