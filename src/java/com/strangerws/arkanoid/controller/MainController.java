@@ -1,18 +1,14 @@
 package com.strangerws.arkanoid.controller;
 
-import com.strangerws.arkanoid.model.Ball;
-import com.strangerws.arkanoid.model.Counter;
-import com.strangerws.arkanoid.model.Plane;
-import com.strangerws.arkanoid.model.Render;
+import com.strangerws.arkanoid.model.*;
+import com.strangerws.arkanoid.util.BrickType;
 import javafx.beans.property.ObjectProperty;
 import javafx.beans.property.SimpleObjectProperty;
-import javafx.event.EventHandler;
 import javafx.fxml.FXML;
 import javafx.geometry.Point2D;
 import javafx.scene.canvas.Canvas;
 import javafx.scene.canvas.GraphicsContext;
 import javafx.scene.control.Button;
-import javafx.scene.input.MouseEvent;
 import javafx.scene.layout.Pane;
 import javafx.scene.paint.Color;
 
@@ -53,29 +49,37 @@ public class MainController {
 
         gc.clearRect(0, 0, windowGame.getWidth(), windowGame.getHeight());
         gc.setFill(Color.YELLOWGREEN);
-        Thread gameThread = new Thread(new Render(balls[lives - 1], new Counter(), gc));
-        gameThread.start();
+        try {
+            Thread gameThread = new Thread(new Game(balls, new Counter(), gc, getBrickLayout(new Reader().readBrickArray())));
+            gameThread.start();
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
 
     }
 
     private void setPlaneControls(Plane plane) {
         final ObjectProperty<Point2D> mousePosition = new SimpleObjectProperty<>();
 
-        plane.setOnMousePressed(new EventHandler<MouseEvent>() {
-            @Override
-            public void handle(MouseEvent event) {
-                mousePosition.set(new Point2D(event.getSceneX(), event.getSceneY()));
-            }
+        plane.setOnMousePressed(event -> mousePosition.set(new Point2D(event.getSceneX(), event.getSceneY())));
+        plane.setOnMouseDragged(event -> {
+            double deltaX = event.getSceneX() - mousePosition.get().getX();
+            plane.movePlane(plane.getLayoutX() + deltaX, windowGame.getWidth());
+            mousePosition.set(new Point2D(event.getSceneX(), event.getSceneY()));
         });
+    }
 
-        plane.setOnMouseDragged(new EventHandler<MouseEvent>() {
-            @Override
-            public void handle(MouseEvent event) {
-                double deltaX = event.getSceneX() - mousePosition.get().getX();
-                plane.movePlane(plane.getLayoutX() + deltaX, windowGame.getWidth());
-                mousePosition.set(new Point2D(event.getSceneX(), event.getSceneY()));
+    private Brick[][] getBrickLayout(int[][] mask) {
+        Brick[][] bricks = new Brick[mask.length][];
+
+        for (int i = 0; i < mask.length; i++) {
+            bricks[i] = new Brick[mask[i].length];
+            for (int j = 0; j < mask[i].length; j++) {
+                if (mask[j][i] > 0) bricks[i][j] = new Brick(i * Brick.BRICK_WIDTH, j * Brick.BRICK_HEIGHT, BrickType.values()[mask[j][i] - 1]);
             }
-        });
+        }
+
+        return bricks;
     }
 
 }

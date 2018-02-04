@@ -9,6 +9,7 @@ public class Ball extends Circle implements Runnable {
     private double velocityY;
     private double worldWidth;
     private double worldHeight;
+    private boolean isFrozen;
 
     public Ball(double x, double y, double velocityX, double velocityY, double worldWidth, double worldHeight) {
         super(x, y, 4, Color.RED);
@@ -16,6 +17,7 @@ public class Ball extends Circle implements Runnable {
         this.velocityY = velocityY;
         this.worldWidth = worldWidth;
         this.worldHeight = worldHeight;
+        this.isFrozen = true;
     }
 
     public double getVelocityX() {
@@ -38,10 +40,10 @@ public class Ball extends Circle implements Runnable {
     public void run() {
 
         do {
-            if (!isLost()) {
+            if (!isLost() && !isFrozen) {
                 move();
                 try {
-                    Thread.sleep(50);
+                    Thread.sleep(200);
                 } catch (InterruptedException e) {
                     e.printStackTrace();
                 }

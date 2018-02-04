@@ -12,7 +12,9 @@ public class Counter implements Runnable{
     public int getScore() {
         return score;
     }
-
+    public void setScore(int score) {
+        this.score = score;
+    }
 
     @Override
     public void run() {
