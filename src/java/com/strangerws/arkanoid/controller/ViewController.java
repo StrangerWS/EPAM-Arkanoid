@@ -47,10 +47,11 @@ public class ViewController {
 
     private AnimationTimer timer;
 
-    private double angleBoundMin = 45;
-    private double angleBoundMax = 135;
-    private int lives = 3;
-    private int speed = 5;
+    //
+    private double angleBoundMin;
+    private double angleBoundMax;
+    private int lives;
+    private int speed;
 
     //Game Objects
     private List<List<Brick>> bricks;
