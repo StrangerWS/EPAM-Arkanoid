@@ -1,4 +1,4 @@
-package com.strangerws.arkanoid.controller;
+package com.strangerws.arkanoid.reader;
 
 import java.io.IOException;
 import java.net.URISyntaxException;

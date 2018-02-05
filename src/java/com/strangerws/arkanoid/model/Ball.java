@@ -5,45 +5,34 @@ import javafx.scene.shape.Circle;
 
 public class Ball extends Circle implements Runnable {
 
-    private double velocityX;
-    private double velocityY;
-    private double worldWidth;
+    private double angle;
+    private double speed;
     private double worldHeight;
     private boolean isFrozen;
 
-    public Ball(double x, double y, double velocityX, double velocityY, double worldWidth, double worldHeight) {
+    public Ball(double x, double y, double speed, double angle, double worldHeight) {
         super(x, y, 4, Color.RED);
-        this.velocityX = velocityX;
-        this.velocityY = velocityY;
-        this.worldWidth = worldWidth;
+        this.speed = speed;
+        this.angle = angle * Math.PI;
         this.worldHeight = worldHeight;
         this.isFrozen = true;
     }
 
-    public double getVelocityX() {
-        return velocityX;
+    public double getAngle() {
+        return angle;
     }
 
-    public void setVelocityX(double velocityX) {
-        this.velocityX = velocityX;
-    }
-
-    public double getVelocityY() {
-        return velocityY;
-    }
-
-    public void setVelocityY(double velocityY) {
-        this.velocityY = velocityY;
+    public void setAngle(double angle) {
+        this.angle = angle;
     }
 
     @Override
     public void run() {
-
         do {
-            if (!isLost() && !isFrozen) {
+            if (!isLost()) {
                 move();
                 try {
-                    Thread.sleep(200);
+                    Thread.sleep(50);
                 } catch (InterruptedException e) {
                     e.printStackTrace();
                 }
@@ -51,18 +40,31 @@ public class Ball extends Circle implements Runnable {
         } while (true);
     }
 
-    private void move() {
-        setCenterX(getCenterX() + velocityX);
-        setCenterY(getCenterY() + velocityY);
+    public void move() {
+        if (!isFrozen) {
+            setCenterX(getCenterX() + speed * Math.cos(angle));
+            setCenterY(getCenterY() + speed * Math.sin(angle));
+        }
+    }
+
+    public void start() {
+        setAngle(angle);
+        isFrozen = false;
     }
 
     public boolean isLost() {
         if (getCenterY() + getRadius() >= worldHeight) {
-            System.out.println("ball is lost");
             return true;
         }
         return false;
     }
 
+    public void moveWithPlane(double planeX) {
+        setCenterX(planeX);
+    }
+
+    public boolean isFrozen() {
+        return isFrozen;
+    }
 
 }

@@ -1,16 +1,20 @@
 package com.strangerws.arkanoid.controller;
 
-import com.strangerws.arkanoid.model.*;
+import com.strangerws.arkanoid.model.Ball;
+import com.strangerws.arkanoid.model.Brick;
+import com.strangerws.arkanoid.model.Counter;
+import com.strangerws.arkanoid.model.Plane;
+import com.strangerws.arkanoid.reader.Reader;
 import com.strangerws.arkanoid.util.BrickType;
 import javafx.beans.property.ObjectProperty;
 import javafx.beans.property.SimpleObjectProperty;
 import javafx.fxml.FXML;
 import javafx.geometry.Point2D;
-import javafx.scene.canvas.Canvas;
-import javafx.scene.canvas.GraphicsContext;
 import javafx.scene.control.Button;
+import javafx.scene.input.KeyCode;
 import javafx.scene.layout.Pane;
-import javafx.scene.paint.Color;
+
+import java.util.Random;
 
 public class MainController {
 
@@ -20,62 +24,59 @@ public class MainController {
     @FXML
     private Button btnPlay;
 
-    private GraphicsContext gc;
-    private Canvas canvas;
-
-    private Ball[] balls;
-    private int lives = 3;
-    private double ballSpawnX = (int) (512 / 2);
-    private double ballSpawnY = (int) (512 - 60);
-
-    private boolean isPlaying;
+    private Ball ball;
+    private double ballSpawnX;
+    private double ballSpawnY;
+    private Plane plane;
 
     @FXML
     public void startGame() {
-        isPlaying = true;
-        balls = new Ball[lives];
-        Plane plane = new Plane(ballSpawnX - 25, ballSpawnY + 12, 50, 8);
+        ballSpawnX = windowGame.getWidth() / 2;
+        ballSpawnY = windowGame.getHeight() - 60;
 
-        setPlaneControls(plane);
+        //moving plane from ball spawn at half of plane width and ball radius
+        plane = new Plane(ballSpawnX - 25, ballSpawnY + 5, 50, 8);
+        setPlaneControls();
 
-        canvas = new Canvas(windowGame.getWidth(), windowGame.getHeight());
-        gc = canvas.getGraphicsContext2D();
-        windowGame.getChildren().add(canvas);
+        windowGame.getScene().setOnKeyPressed(e -> {
+            if (e.getCode() == KeyCode.W) {
+                ball.start();
+            }
+        });
+
         windowGame.getChildren().add(plane);
-
-        for (int i = 0; i < lives; i++) {
-            balls[i] = new Ball(ballSpawnX, ballSpawnY, 0, 0, windowGame.getWidth(), windowGame.getHeight());
-        }
-
-        gc.clearRect(0, 0, windowGame.getWidth(), windowGame.getHeight());
-        gc.setFill(Color.YELLOWGREEN);
+        ball = new Ball(ballSpawnX, ballSpawnY, 5, Math.random(), windowGame.getHeight());
+        windowGame.getChildren().add(ball);
         try {
-            Thread gameThread = new Thread(new Game(balls, new Counter(), gc, getBrickLayout(new Reader().readBrickArray())));
-            gameThread.start();
+            GameController gc = new GameController(ball, new Counter(), getBrickLayout(new Reader().readBrickArray()), plane, windowGame);
+            gc.setPlaying(true);
         } catch (Exception e) {
             e.printStackTrace();
         }
 
     }
 
-    private void setPlaneControls(Plane plane) {
+    private void setPlaneControls() {
         final ObjectProperty<Point2D> mousePosition = new SimpleObjectProperty<>();
 
         plane.setOnMousePressed(event -> mousePosition.set(new Point2D(event.getSceneX(), event.getSceneY())));
         plane.setOnMouseDragged(event -> {
             double deltaX = event.getSceneX() - mousePosition.get().getX();
-            plane.movePlane(plane.getLayoutX() + deltaX, windowGame.getWidth());
+            plane.movePlane(plane.getX() + deltaX, windowGame.getWidth());
+            if (ball.isFrozen())
+                ball.moveWithPlane(plane.getX() + plane.getWidth() / 2);
             mousePosition.set(new Point2D(event.getSceneX(), event.getSceneY()));
         });
     }
-
     private Brick[][] getBrickLayout(int[][] mask) {
         Brick[][] bricks = new Brick[mask.length][];
 
         for (int i = 0; i < mask.length; i++) {
             bricks[i] = new Brick[mask[i].length];
             for (int j = 0; j < mask[i].length; j++) {
-                if (mask[j][i] > 0) bricks[i][j] = new Brick(i * Brick.BRICK_WIDTH, j * Brick.BRICK_HEIGHT, BrickType.values()[mask[j][i] - 1]);
+                if (mask[j][i] > 0)
+                    bricks[i][j] = new Brick(i * Brick.BRICK_WIDTH, j * Brick.BRICK_HEIGHT, BrickType.values()[mask[j][i] - 1]);
+                if (bricks[i][j] != null) windowGame.getChildren().add(bricks[i][j]);
             }
         }
 

@@ -10,7 +10,6 @@ public class Brick extends Rectangle {
     public static final int BRICK_HEIGHT = 8;
 
     private int brickHealth;
-    private Color color;
     private boolean isIndestructible;
     private int points;
 
@@ -18,17 +17,13 @@ public class Brick extends Rectangle {
         super(x, y, BRICK_WIDTH, BRICK_HEIGHT);
         brickHealth = type.brickHealth;
         setStroke(Color.BLACK);
-        color = type.color;
+        setFill(type.color);
         isIndestructible = type.isIndestructible;
         points = type.points;
     }
 
     public int getBrickHealth() {
         return brickHealth;
-    }
-
-    public Color getColor() {
-        return color;
     }
 
     public boolean isIndestructible() {
