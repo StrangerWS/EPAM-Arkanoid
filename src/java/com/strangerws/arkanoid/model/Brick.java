@@ -7,7 +7,7 @@ import javafx.scene.shape.Rectangle;
 public class Brick extends Rectangle {
 
     public static final int BRICK_WIDTH = 32;
-    public static final int BRICK_HEIGHT = 8;
+    public static final int BRICK_HEIGHT = 16;
 
     private int brickHealth;
     private boolean isIndestructible;
@@ -35,7 +35,7 @@ public class Brick extends Rectangle {
     }
 
     public void decreaseHealth() {
-        if (brickHealth < 0) {
+        if (brickHealth > 0) {
             brickHealth--;
         }
     }

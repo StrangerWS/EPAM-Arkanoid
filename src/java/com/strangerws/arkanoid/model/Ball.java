@@ -3,20 +3,12 @@ package com.strangerws.arkanoid.model;
 import javafx.scene.paint.Color;
 import javafx.scene.shape.Circle;
 
-public class Ball extends Circle implements Runnable {
+public class Ball extends Circle {
 
     private double angle;
     private double speed;
     private double worldHeight;
     private boolean isFrozen;
-
-    public Ball(double x, double y, double speed, double angle, double worldHeight) {
-        super(x, y, 4, Color.RED);
-        this.speed = speed;
-        this.angle = angle * Math.PI;
-        this.worldHeight = worldHeight;
-        this.isFrozen = true;
-    }
 
     public double getAngle() {
         return angle;
@@ -26,19 +18,22 @@ public class Ball extends Circle implements Runnable {
         this.angle = angle;
     }
 
-    @Override
-    public void run() {
-        do {
-            if (!isLost()) {
-                move();
-                try {
-                    Thread.sleep(50);
-                } catch (InterruptedException e) {
-                    e.printStackTrace();
-                }
-            } else return;
-        } while (true);
+
+    public boolean isFrozen() {
+        return isFrozen;
     }
+
+    public void setFrozen(boolean frozen) {
+        this.isFrozen = frozen;
+    }
+    public Ball(double x, double y, double speed, double angle, double worldHeight) {
+        super(x, y, 4, Color.RED);
+        this.speed = speed;
+        this.angle = angle * Math.PI;
+        this.worldHeight = worldHeight;
+        this.isFrozen = true;
+    }
+
 
     public void move() {
         if (!isFrozen) {
@@ -63,8 +58,5 @@ public class Ball extends Circle implements Runnable {
         setCenterX(planeX);
     }
 
-    public boolean isFrozen() {
-        return isFrozen;
-    }
 
 }
