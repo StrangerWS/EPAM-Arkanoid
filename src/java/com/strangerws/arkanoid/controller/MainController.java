@@ -14,6 +14,8 @@ import javafx.scene.control.Button;
 import javafx.scene.input.KeyCode;
 import javafx.scene.layout.Pane;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Random;
 
 public class MainController {
@@ -68,15 +70,15 @@ public class MainController {
             mousePosition.set(new Point2D(event.getSceneX(), event.getSceneY()));
         });
     }
-    private Brick[][] getBrickLayout(int[][] mask) {
-        Brick[][] bricks = new Brick[mask.length][];
+    private List<List<Brick>> getBrickLayout(int[][] mask) {
+        List<List<Brick>> bricks = new ArrayList<>(mask.length);
 
         for (int i = 0; i < mask.length; i++) {
-            bricks[i] = new Brick[mask[i].length];
+            bricks.add(new ArrayList<>(mask[i].length));
             for (int j = 0; j < mask[i].length; j++) {
                 if (mask[j][i] > 0)
-                    bricks[i][j] = new Brick(i * Brick.BRICK_WIDTH, j * Brick.BRICK_HEIGHT, BrickType.values()[mask[j][i] - 1]);
-                if (bricks[i][j] != null) windowGame.getChildren().add(bricks[i][j]);
+                    bricks.get(i).add(new Brick(i * Brick.BRICK_WIDTH, j * Brick.BRICK_HEIGHT, BrickType.values()[mask[j][i] - 1]));
+                if (bricks.get(i).get(j) != null) windowGame.getChildren().add(bricks.get(i).get(j));
             }
         }
 

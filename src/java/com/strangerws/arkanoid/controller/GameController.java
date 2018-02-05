@@ -7,12 +7,14 @@ import com.strangerws.arkanoid.model.Plane;
 import javafx.animation.AnimationTimer;
 import javafx.scene.layout.Pane;
 
+import java.util.List;
+
 public class GameController {
 
     private Ball ball;
     private int lives = 3;
     private Counter counter;
-    private Brick[][] bricks;
+    private List<List<Brick>> bricks;
     private Plane plane;
     private Pane pane;
     private boolean isPlaying;
@@ -25,7 +27,7 @@ public class GameController {
         isPlaying = playing;
     }
 
-    public GameController(Ball ball, Counter counter, Brick[][] bricks, Plane plane, Pane pane) {
+    public GameController(Ball ball, Counter counter, List<List<Brick>> bricks, Plane plane, Pane pane) {
         this.ball = ball;
         this.counter = counter;
         this.bricks = bricks;
@@ -65,18 +67,19 @@ public class GameController {
             horizontalReflection(ball);
         }
 
-        for (Brick[] b : bricks)
+        for (List<Brick> b: bricks)
             for (Brick brick : b) {
                 if (brick != null) {
-                    if (ball.intersects(brick.getX(), brick.getY() + brick.getHeight(), brick.getWidth(), 1)) {
+                    if (ball.intersects(brick.getX(), brick.getY() + brick.getHeight() - 1, brick.getWidth(), 1) || ball.intersects(brick.getX(), brick.getY(), brick.getWidth(), 1)) {
                         horizontalReflection(ball);
                         brick.decreaseHealth();
-                    } else if (ball.intersects(brick.getX(), brick.getY(), 1, brick.getHeight()) || ball.intersects(brick.getX() + brick.getWidth(), brick.getY(), 1, brick.getHeight())) {
+                    } else if (ball.intersects(brick.getX(), brick.getY(), 1, brick.getHeight()) || ball.intersects(brick.getX() + brick.getWidth() - 1, brick.getY(), 1, brick.getHeight())) {
                         verticalReflection(ball);
                         brick.decreaseHealth();
                     }
                     if (brick.getBrickHealth() <= 0) {
                         pane.getChildren().remove(brick);
+                        brick = null;
                     }
                 }
             }
