@@ -12,7 +12,7 @@ import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.ThreadLocalRandom;
 
-public class GameController {
+public class GameController implements Runnable {
 
 
     private int lives;
@@ -21,7 +21,7 @@ public class GameController {
     private boolean isPlaying;
     private boolean gameOver;
 
-    private Ball ball;
+    private Ball[] balls;
     private List<List<Brick>> bricks;
     private Plane plane;
 
@@ -67,12 +67,12 @@ public class GameController {
         this.gameOverMessage = gameOverMessage;
     }
 
-    public Ball getBall() {
-        return ball;
+    public Ball[] getBalls() {
+        return balls;
     }
 
-    public void setBall(Ball ball) {
-        this.ball = ball;
+    public void setBalls(Ball[] balls) {
+        this.balls = balls;
     }
 
     public List<List<Brick>> getBricks() {
@@ -130,16 +130,19 @@ public class GameController {
         if (angleBoundMax >= angleBoundMin) {
             this.angleBoundMin = angleBoundMin;
             this.angleBoundMax = angleBoundMax;
-        } else {
+        } else if (angleBoundMax < angleBoundMin) {
             this.angleBoundMin = angleBoundMax;
             this.angleBoundMax = angleBoundMin;
         }
         ballSpawnX = worldWidth / 2;
         ballSpawnY = worldHeight - 60;
 
-        double angle = ThreadLocalRandom.current().nextDouble(angleBoundMin, angleBoundMax);
-        ball = new Ball(ballSpawnX, ballSpawnY, speed, angle, worldHeight);
-
+        double angle = angleBoundMin;
+        if (angleBoundMax != angleBoundMin)
+            angle = ThreadLocalRandom.current().nextDouble(angleBoundMin, angleBoundMax);
+        for (int i = 0; i < lives; i++) {
+            balls[i] = new Ball(ballSpawnX, ballSpawnY, speed, angle, worldHeight);
+        }
         bricks = new CopyOnWriteArrayList<>();
         int[][] mask;
         try {
@@ -163,52 +166,76 @@ public class GameController {
     }
 
     void newTurn() {
-        ball.setCenterX(ballSpawnX);
-        ball.setCenterY(ballSpawnY);
-        plane.setX(ballSpawnX - 25);
-        plane.setY(ballSpawnY + 5);
-        ball.setFrozen(true);
-        ball.setAngle(ThreadLocalRandom.current().nextDouble(angleBoundMin, angleBoundMax));
+        decreaseLives();
+        for (int i = 0; i < lives; i++) {
+            balls[i].setCenterX(ballSpawnX);
+            balls[i].setCenterY(ballSpawnY);
+            plane.setX(ballSpawnX - 25);
+            plane.setY(ballSpawnY + 5);
+            balls[i].setFrozen(true);
+            if (angleBoundMax != angleBoundMin) {
+                balls[i].setAngle(ThreadLocalRandom.current().nextDouble(angleBoundMin, angleBoundMax));
+            } else {
+                balls[i].setAngle(angleBoundMin);
+            }
+        }
     }
-
 
     synchronized void checkReflections() {
         if (maxScore == score) gameOver = true;
         gameOverMessage = "You Win! All bricks are destroyed!";
+        for (int i = 0; i < lives; i++) {
 
-        if (ball.getBoundsInLocal().intersects(0, -2, worldWidth, 2)) {
-            horizontalReflection(ball);
-        }
-        if (ball.getBoundsInLocal().intersects(worldWidth, 0, 2, worldHeight)) {
-            verticalReflection(ball);
-        }
-        if (ball.getBoundsInLocal().intersects(-2, 0, 2, worldHeight)) {
-            verticalReflection(ball);
-        }
-        if (ball.getBoundsInLocal().intersects(plane.getLayoutBounds())) {
-            horizontalReflection(ball);
-        }
-
-        for (List<Brick> b : bricks)
-            for (Brick brick : b) {
-                boolean intersected = false;
-                if (ball.getBoundsInLocal().intersects(brick.getX(), brick.getY() + brick.getHeight() - 1, brick.getWidth(), 1) || ball.getBoundsInLocal().intersects(brick.getX(), brick.getY(), brick.getWidth(), 1)) {
-                    horizontalReflection(ball);
-                    intersected = true;
-                }
-                if (ball.getBoundsInLocal().intersects(brick.getX(), brick.getY(), 1, brick.getHeight()) || ball.getBoundsInLocal().intersects(brick.getX() + brick.getWidth() - 1, brick.getY(), 1, brick.getHeight())) {
-                    verticalReflection(ball);
-                    intersected = true;
-                }
-                if (intersected && !brick.isIndestructible()) {
-                    brick.decreaseHealth();
-                }
-                if (!brick.isIndestructible() && brick.getBrickHealth() <= 0) {
-                    brick.setVisible(false);
-                    b.remove(brick);
-                    score += brick.getPoints();
-                }
+            if (balls[i].getBoundsInLocal().intersects(0, -2, worldWidth, 2)) {
+                horizontalReflection(balls[i]);
             }
+            if (balls[i].getBoundsInLocal().intersects(worldWidth, 0, 2, worldHeight)) {
+                verticalReflection(balls[i]);
+            }
+            if (balls[i].getBoundsInLocal().intersects(-2, 0, 2, worldHeight)) {
+                verticalReflection(balls[i]);
+            }
+            if (balls[i].getBoundsInLocal().intersects(plane.getLayoutBounds())) {
+                horizontalReflection(balls[i]);
+            }
+
+            for (List<Brick> b : bricks)
+                for (Brick brick : b) {
+
+                    if ((intersectUpDown(balls[i], brick) || intersectLeftRight(balls[i], brick)) && !brick.isIndestructible()) {
+                        brick.decreaseHealth();
+                    }
+                    if (!brick.isIndestructible() && brick.getBrickHealth() <= 0) {
+                        brick.setVisible(false);
+                        b.remove(brick);
+                        score += brick.getPoints();
+                    }
+                }
+        }
+    }
+
+    private boolean intersectUpDown(Ball ball, Brick brick) {
+        if (ball.getBoundsInLocal().intersects(brick.getX(), brick.getY() + brick.getHeight() - 2, brick.getWidth(), 2)) {
+            horizontalReflection(ball);
+            return true;
+        }
+        if (ball.getBoundsInLocal().intersects(brick.getX(), brick.getY(), brick.getWidth(), 2)) {
+            horizontalReflection(ball);
+            return true;
+        }
+        return false;
+    }
+
+    private boolean intersectLeftRight(Ball ball, Brick brick) {
+        if (ball.getBoundsInLocal().intersects(brick.getX(), brick.getY(), 2, brick.getHeight())) {
+            verticalReflection(ball);
+            return true;
+        }
+        if (ball.getBoundsInLocal().intersects(brick.getX() + brick.getWidth() - 2, brick.getY(), 2, brick.getHeight())) {
+            verticalReflection(ball);
+            return true;
+        }
+        return false;
     }
 
     private void horizontalReflection(Ball ball) {
@@ -229,4 +256,14 @@ public class GameController {
         }
     }
 
+    @Override
+    public void run() {
+        Thread[] ballThreads = new Thread[lives];
+        for (int i = 0; i < lives; i++) {
+
+        }
+        if (isPlaying) {
+            checkReflections();
+        }
+    }
 }

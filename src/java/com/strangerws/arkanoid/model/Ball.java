@@ -3,7 +3,7 @@ package com.strangerws.arkanoid.model;
 import javafx.scene.paint.Color;
 import javafx.scene.shape.Circle;
 
-public class Ball extends Circle {
+public class Ball extends Circle implements Runnable{
 
     private double angle;
     private double speed;
@@ -29,7 +29,10 @@ public class Ball extends Circle {
     public Ball(double x, double y, double speed, double angle, double worldHeight) {
         super(x, y, 4, Color.RED);
         this.speed = speed;
-        this.angle = angle * Math.PI;
+        if (angle == 90) {
+            angle++;
+        }
+        this.angle = Math.toRadians(angle);
         this.worldHeight = worldHeight;
         this.isFrozen = true;
     }
@@ -59,4 +62,15 @@ public class Ball extends Circle {
     }
 
 
+    @Override
+    public void run() {
+        if(!isLost()){
+            move();
+            try {
+                Thread.sleep(100);
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
+        }
+    }
 }
