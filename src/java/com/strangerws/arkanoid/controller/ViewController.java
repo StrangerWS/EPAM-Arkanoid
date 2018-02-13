@@ -8,15 +8,17 @@ import javafx.beans.property.ObjectProperty;
 import javafx.beans.property.SimpleObjectProperty;
 import javafx.fxml.FXML;
 import javafx.geometry.Point2D;
-import javafx.scene.control.*;
+import javafx.scene.canvas.Canvas;
+import javafx.scene.canvas.GraphicsContext;
+import javafx.scene.control.Alert;
+import javafx.scene.control.Button;
+import javafx.scene.control.ChoiceBox;
+import javafx.scene.control.Label;
 import javafx.scene.input.KeyCode;
 import javafx.scene.layout.Pane;
+import javafx.scene.paint.Color;
 
-import java.text.SimpleDateFormat;
-import java.util.Calendar;
-import java.util.Date;
 import java.util.List;
-import java.util.Locale;
 
 public class ViewController {
 
@@ -44,6 +46,9 @@ public class ViewController {
 
     private AnimationTimer timer;
 
+    private GraphicsContext gc;
+    private Canvas canvas;
+
     //
     private double angleBoundMin;
     private double angleBoundMax;
@@ -52,11 +57,12 @@ public class ViewController {
 
     //Game Objects
     private List<List<Brick>> bricks;
-    private Ball ball;
+    private List<Ball> balls;
     private Plane plane;
 
     //Game Controller
     private GameController game;
+    private Thread gameThread;
 
     public void initialize() {
         for (int i = 5; i < 176; i++) {
@@ -81,20 +87,23 @@ public class ViewController {
         if (playBtn.getText().toLowerCase().equals("play")) {
             readControls();
             game = new GameController(windowGame.getWidth(), windowGame.getHeight(), angleBoundMin, angleBoundMax, lives, speed);
-            initializeGame();
-            initCycle();
+            initializeGraphics();
+            initializeGameScreen();
+            gameThread = new Thread(game);
+            gameThread.setDaemon(true);
+            game.setPlaying(true);
             timer.start();
+            gameThread.start();
             playBtn.setText("Stop");
             disableControls();
             pauseBtn.setDisable(false);
         } else {
             disposeGame();
             game.setGameOver(true);
-            timer.stop();
             playBtn.setText("Play");
             pauseBtn.setDisable(true);
             enableControls();
-
+            timer.stop();
         }
     }
 
@@ -130,8 +139,8 @@ public class ViewController {
         speedInput.setDisable(false);
     }
 
-    private void initializeGame() {
-        ball = game.getBall();
+    private void initializeGameScreen() {
+        balls = game.getBalls();
         plane = game.getPlane();
         bricks = game.getBricks();
 
@@ -139,7 +148,7 @@ public class ViewController {
         game.setPlaying(true);
 
         windowGame.getChildren().add(plane);
-        windowGame.getChildren().add(ball);
+        //windowGame.getChildren().addAll(balls);
         for (List<Brick> b : bricks) {
             for (Brick brick : b) {
                 windowGame.getChildren().addAll(brick);
@@ -147,40 +156,33 @@ public class ViewController {
         }
     }
 
-    private void disposeGame() {
-        windowGame.getChildren().removeAll(windowGame.getChildren());
-    }
+    private void initializeGraphics() {
+        canvas = new Canvas(windowGame.getWidth(), windowGame.getHeight());
+        gc = canvas.getGraphicsContext2D();
+        windowGame.getChildren().add(canvas);
 
-    private void initCycle() {
-        Date date = new Date();
         timer = new AnimationTimer() {
             @Override
             public void handle(long now) {
-                Calendar date2 = Calendar.getInstance();
-                long seconds = date2.getTime().getTime() - date.getTime();
-                SimpleDateFormat gameTime = new SimpleDateFormat("mm:ss", Locale.getDefault());
-                timeLabel.setText("Time: " + gameTime.format(seconds));
-                if (game.isPlaying()) {
-                    scoreLabel.setText("Score: " + game.getScore());
-                    livesLabel.setText("Lives: " + game.getLives());
-                    if (!ball.isLost()) {
-                        ball.move();
-                        game.checkReflections();
-                    } else {
-                        game.newTurn();
-                    }
-                }
-
-                if (game.isGameOver()) {
-                    timer.stop();
-                    disposeGame();
-                    showDialogGameOver();
-                    playBtn.setText("Play");
-                    pauseBtn.setText("Pause");
-                    pauseBtn.setDisable(true);
-                }
+                gc.clearRect(0, 0, windowGame.getWidth(), windowGame.getHeight());
+                gc.setFill(Color.YELLOWGREEN);
+                gc.fillRect(0, 0, windowGame.getWidth(), windowGame.getHeight());
+                renderBalls();
             }
         };
+    }
+
+    private void renderBalls() {
+        for (Ball ball : balls) {
+            gc.setFill(ball.getFill());
+            gc.fillOval(ball.getHitboxX(), ball.getHitboxY(), ball.getWidth(), ball.getHeight());
+            gc.setStroke(Color.BLACK);
+            gc.strokeOval(ball.getHitboxX(), ball.getHitboxY(), ball.getWidth(), ball.getHeight());
+        }
+    }
+
+    private void disposeGame() {
+        windowGame.getChildren().removeAll(windowGame.getChildren());
     }
 
     private void setControls() {
@@ -192,21 +194,23 @@ public class ViewController {
             double deltaX = event.getSceneX() - mousePosition.get().getX();
             if (game.isPlaying()) {
                 plane.movePlane(plane.getX() + deltaX, windowGame.getWidth());
-                if (ball.isFrozen())
-                    ball.moveWithPlane(plane.getX() + plane.getWidth() / 2);
+                for (Ball ball : balls) {
+                    if (ball.isFrozen())
+                        ball.moveWithPlane(plane.getX() + plane.getWidth() / 2);
+                }
                 mousePosition.set(new Point2D(event.getSceneX(), event.getSceneY()));
             }
         });
 
         windowGame.getScene().setOnKeyPressed(e -> {
-            if (e.getCode() == KeyCode.ENTER) {
-                if (ball.isFrozen()) {
-                    ball.start();
-
-                } else {
-                    pauseBtnPressed();
+            if (e.getCode() == KeyCode.W) {
+                for (Ball ball : balls) {
+                    if (ball.isFrozen()) {
+                        ball.start();
+                    } else {
+                        pauseBtnPressed();
+                    }
                 }
-
             }
         });
 

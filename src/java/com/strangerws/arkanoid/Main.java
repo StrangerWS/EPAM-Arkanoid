@@ -8,14 +8,17 @@ import javafx.stage.Stage;
 
 public class Main extends Application {
 
+    private static final String GAME_SCREEN_LOCATION = "/fxml/game.fxml";
+    private static final String GAME_CSS_LOCATION = "/css/game.css";
+    private final FXMLLoader loader = new FXMLLoader();
+
     @Override
     public void start(Stage primaryStage) throws Exception {
-        FXMLLoader loader = new FXMLLoader();
-        loader.setLocation(getClass().getResource("/fxml/game.fxml"));
+        loader.setLocation(getClass().getResource(GAME_SCREEN_LOCATION));
         Parent root = loader.load();
         Scene scene = new Scene(root);
 
-        scene.getStylesheets().add("/css/game.css");
+        scene.getStylesheets().add(GAME_CSS_LOCATION);
 
         primaryStage.setTitle("Arkanoid by StrangerWS");
         primaryStage.setScene(scene);
