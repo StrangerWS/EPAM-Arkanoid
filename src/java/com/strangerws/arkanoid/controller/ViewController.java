@@ -75,6 +75,8 @@ public class ViewController {
     private Thread gameThread;
 
     public void initialize() {
+        //an easy way to control user input - using a choice boxes
+        //another layer of "fool`s security"
         for (int i = 5; i < 176; i++) {
             minAngleInput.getItems().add((double) i);
             maxAngleInput.getItems().add((double) i);
@@ -236,6 +238,7 @@ public class ViewController {
         windowGame.getChildren().removeAll(windowGame.getChildren());
     }
 
+    //Using mouse as controls of a plane
     private void setControls() {
         final ObjectProperty<Point2D> mousePosition = new SimpleObjectProperty<>();
 
@@ -254,6 +257,9 @@ public class ViewController {
         });
 
         windowGame.getScene().setOnKeyPressed(e -> {
+            //Enter and space invoke focused button methods, using any other button
+            //With this button you can pause the game faster than if you place the mouse pointer on UI button
+            //And unpause game with pointer ready to control the plane
             if (e.getCode() == KeyCode.W) {
                 for (Ball ball : balls) {
                     if (ball.isAiming()) {
@@ -267,6 +273,7 @@ public class ViewController {
 
     }
 
+    //Showing your achievements
     private void showDialogGameOver() {
         Alert alert = new Alert(Alert.AlertType.INFORMATION);
         alert.setTitle(GAME_OVER);
