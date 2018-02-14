@@ -9,6 +9,8 @@ import java.util.List;
 
 public class Reader {
 
+    //Getting brick array from txt brick layout
+    //It is believed that input file has 16*16 matrix with numbers from 0 to 6
     public int[][] readBrickArray() throws URISyntaxException, IOException {
         List<String> lines = new ArrayList<>();
         Files.lines(Paths.get(getClass().getResource("/txt/brickLayout.txt").toURI())).forEach(lines::add);

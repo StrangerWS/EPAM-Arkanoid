@@ -5,8 +5,12 @@ import javafx.scene.shape.Rectangle;
 
 public class Plane extends Rectangle {
 
-    public Plane(double x, double y, double width, double height) {
-        super(x, y, width, height);
+    public static final int PLANE_WIDTH = 50;
+    public static final int PLANE_HEIGHT = 8;
+
+
+    public Plane(double x, double y) {
+        super(x, y, PLANE_WIDTH, PLANE_HEIGHT);
         setFill(Color.GREEN);
         setStroke(Color.BLACK);
     }

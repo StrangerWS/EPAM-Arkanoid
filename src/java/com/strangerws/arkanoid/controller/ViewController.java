@@ -17,14 +17,20 @@ import javafx.scene.control.Label;
 import javafx.scene.input.KeyCode;
 import javafx.scene.layout.Pane;
 import javafx.scene.paint.Color;
+import javafx.util.Pair;
 
 import java.text.SimpleDateFormat;
-import java.util.Calendar;
-import java.util.Date;
-import java.util.List;
-import java.util.Locale;
+import java.util.*;
 
 public class ViewController {
+
+
+    //Some static strings and constants
+    private static final String PLAY = "Play";
+    private static final String STOP = "Stop";
+    private static final String PAUSE = "Pause";
+    private static final String RESUME = "Resume";
+    private static final String GAME_OVER = "Game Over!";
 
     // FXML Objects
     @FXML
@@ -60,7 +66,7 @@ public class ViewController {
     private int speed;
 
     //Game Objects
-    private List<List<Brick>> bricks;
+    private Map<Pair<Integer, Integer>, Brick> bricks;
     private List<Ball> balls;
     private Plane plane;
 
@@ -87,8 +93,9 @@ public class ViewController {
     }
 
     @FXML
+    //A good way to create double-function button
     public void playBtnPressed() {
-        if (playBtn.getText().toLowerCase().equals("play")) {
+        if (playBtn.getText().equals(PLAY)) {
             readControls();
             game = new GameController(windowGame.getWidth(), windowGame.getHeight(), angleBoundMin, angleBoundMax, lives, speed);
             initializeGraphics();
@@ -98,14 +105,14 @@ public class ViewController {
             gameThread.setDaemon(true);
             timer.start();
             gameThread.start();
-            playBtn.setText("Stop");
+            playBtn.setText(STOP);
             disableControls();
             pauseBtn.setDisable(false);
         } else {
             game.setGameOver(true);
             gameThread.interrupt();
             disposeGame();
-            playBtn.setText("Play");
+            playBtn.setText(PLAY);
             pauseBtn.setDisable(true);
             enableControls();
             timer.stop();
@@ -114,15 +121,16 @@ public class ViewController {
 
     @FXML
     public void pauseBtnPressed() {
-        if (pauseBtn.getText().toLowerCase().equals("pause")) {
+        if (pauseBtn.getText().equals(PAUSE)) {
             game.setPlaying(false);
-            pauseBtn.setText("Resume");
+            pauseBtn.setText(RESUME);
         } else {
             game.setPlaying(true);
-            pauseBtn.setText("Pause");
+            pauseBtn.setText(PAUSE);
         }
     }
 
+    //Those methods doing the things in their names
     private void readControls() {
         angleBoundMin = minAngleInput.getValue();
         angleBoundMax = maxAngleInput.getValue();
@@ -153,11 +161,10 @@ public class ViewController {
         game.setPlaying(true);
 
         windowGame.getChildren().add(plane);
-        for (List<Brick> b : bricks) {
-            for (Brick brick : b) {
-                windowGame.getChildren().addAll(brick);
-            }
+        for (Map.Entry<Pair<Integer, Integer>, Brick> brick : bricks.entrySet()) {
+            windowGame.getChildren().add(brick.getValue());
         }
+
     }
 
     private void initializeGraphics() {
@@ -166,6 +173,8 @@ public class ViewController {
         windowGame.getChildren().add(canvas);
 
         Date date = new Date();
+        //We are using timer to check game state and render balls on canvas
+        //Also this is a good low-cost way to make a timer
         timer = new AnimationTimer() {
             @Override
             public void handle(long now) {
@@ -188,11 +197,12 @@ public class ViewController {
                     livesLabel.setText("Lives: " + game.getLives());
                 }
 
+                //Disposing game and killing game thread
                 if (game.isGameOver()) {
                     game.setGameOver(true);
                     gameThread.interrupt();
                     disposeGame();
-                    playBtn.setText("Play");
+                    playBtn.setText(PLAY);
                     pauseBtn.setDisable(true);
                     enableControls();
                     timer.stop();
@@ -202,21 +212,15 @@ public class ViewController {
         };
     }
 
+    //Checking health of all bricks in timer
+    //because bricks is a part of UI
     private void checkBricks() {
-        int score = 0;
-        int deletedBricks = 0;
-        for (List<Brick> b : bricks) {
-            for (Brick brick : b) {
-                if (!brick.isIndestructible() && brick.getBrickHealth() <= 0) {
-                    brick.setVisible(false);
-                    score += brick.getPoints() * game.getLives() / livesInput.getValue() * speedInput.getValue();
-                    deletedBricks++;
-                    b.remove(brick);
-                }
+        for (Map.Entry<Pair<Integer, Integer>, Brick> brick : bricks.entrySet()) {
+            if (!brick.getValue().isIndestructible() && brick.getValue().getBrickHealth() <= 0) {
+                brick.getValue().setVisible(false);
+                bricks.remove(brick.getKey(), brick.getValue());
             }
         }
-        game.setScore(game.getScore() + score);
-        game.setDeletedBricks(game.getDeletedBricks() + deletedBricks);
     }
 
     private void renderBalls() {
@@ -265,7 +269,7 @@ public class ViewController {
 
     private void showDialogGameOver() {
         Alert alert = new Alert(Alert.AlertType.INFORMATION);
-        alert.setTitle("Game Over!");
+        alert.setTitle(GAME_OVER);
         alert.setHeaderText(game.getGameOverMessage());
         alert.setContentText("Your " + scoreLabel.getText());
         alert.show();

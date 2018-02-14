@@ -5,38 +5,52 @@ import com.strangerws.arkanoid.model.Brick;
 import com.strangerws.arkanoid.model.Plane;
 import com.strangerws.arkanoid.reader.Reader;
 import com.strangerws.arkanoid.util.BrickType;
+import javafx.util.Pair;
 
 import java.io.IOException;
 import java.net.URISyntaxException;
 import java.util.List;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.ThreadLocalRandom;
 
 public class GameController implements Runnable {
 
+    //Some constants and statics
+    private static final String GAME_WON = "You Win! All bricks are destroyed!";
+    private static final String GAME_LOST = "You Lose! All balls are lost!";
+    private static final int PLANE_OFFSET = 5;
 
+    //Game Properties
     private int lives;
     private int score;
     private int deletedBricks;
     private int maxDeletedBricks;
     private boolean isPlaying;
     private boolean gameOver;
-
-    private List<Ball> balls;
-    private List<Thread> ballThreads;
-    private List<List<Brick>> bricks;
-    private Plane plane;
-
     private double angleBoundMin;
     private double angleBoundMax;
+    private String gameOverMessage;
+    private final int maxLives;
+    private final int speed;
+
+    //Game Objects
+    private List<Ball> balls;
+    private List<Thread> ballThreads;
+    private Map<Pair<Integer, Integer>, Brick> bricks;
+    private Plane plane;
+
+
+    //World Properties
     private double worldWidth;
     private double worldHeight;
     private double ballSpawnX;
     private double ballSpawnY;
 
-    private String gameOverMessage;
 
-
+    // Getters and Setters
+    // -------------------------------------------------------------
     public int getLives() {
         return lives;
     }
@@ -85,11 +99,11 @@ public class GameController implements Runnable {
         this.balls = balls;
     }
 
-    public List<List<Brick>> getBricks() {
+    public Map<Pair<Integer, Integer>, Brick> getBricks() {
         return bricks;
     }
 
-    public void setBricks(List<List<Brick>> bricks) {
+    public void setBricks(Map<Pair<Integer, Integer>, Brick> bricks) {
         this.bricks = bricks;
     }
 
@@ -132,11 +146,14 @@ public class GameController implements Runnable {
     public void setWorldHeight(double worldHeight) {
         this.worldHeight = worldHeight;
     }
+    // -------------------------------------------------------------
 
     GameController(double worldWidth, double worldHeight, double angleBoundMin, double angleBoundMax, int lives, int speed) {
         this.worldWidth = worldWidth;
         this.worldHeight = worldHeight;
         this.lives = lives;
+        this.maxLives = lives;
+        this.speed = speed;
         setAngleBounds(angleBoundMin, angleBoundMax);
 
         ballSpawnX = worldWidth / 2;
@@ -144,12 +161,13 @@ public class GameController implements Runnable {
 
         generateBricks();
         generatePlane();
-        generateBalls(speed);
+        generateBalls();
 
         isPlaying = false;
     }
 
     private void setAngleBounds(double angleBoundMin, double angleBoundMax) {
+        // "Fool`s security" like it called
         if (angleBoundMax >= angleBoundMin) {
             this.angleBoundMin = angleBoundMin;
             this.angleBoundMax = angleBoundMax;
@@ -159,33 +177,38 @@ public class GameController implements Runnable {
         }
     }
 
-    private void generateBalls(int speed) {
+    private void generateBalls() {
         balls = new CopyOnWriteArrayList<>();
         double angle = angleBoundMin;
         for (int i = 0; i < lives; i++) {
             if (angleBoundMax != angleBoundMin)
+                //Randomizing angles
                 angle = ThreadLocalRandom.current().nextDouble(angleBoundMin, angleBoundMax);
             balls.add(new Ball(ballSpawnX, ballSpawnY, bricks, plane, speed, angle, worldWidth, worldHeight));
         }
         ballThreads = new CopyOnWriteArrayList<>();
         for (int i = 0; i < lives; i++) {
             ballThreads.add(new Thread(balls.get(i)));
+            //When game is closed by button in upper corner
+            //ball threads will be in infinite cycle
+            //this option makes them die with main thread
             ballThreads.get(i).setDaemon(true);
             ballThreads.get(i).start();
         }
     }
 
     private void generateBricks() {
-        bricks = new CopyOnWriteArrayList<>();
+        bricks = new ConcurrentHashMap<Pair<Integer, Integer>, Brick>();
         int[][] mask;
         try {
             mask = new Reader().readBrickArray();
             for (int i = 0; i < mask.length; i++) {
-                bricks.add(new CopyOnWriteArrayList<>());
                 for (int j = 0; j < mask[i].length; j++) {
+                    //rotate mask by -90 degrees
                     if (mask[j][i] > 0) {
-                        bricks.get(i).add(new Brick(i * Brick.BRICK_WIDTH, j * Brick.BRICK_HEIGHT, BrickType.values()[mask[j][i] - 1]));
+                        bricks.put(new Pair<Integer, Integer>(i * Brick.BRICK_WIDTH, j * Brick.BRICK_HEIGHT), new Brick(i * Brick.BRICK_WIDTH, j * Brick.BRICK_HEIGHT, BrickType.values()[mask[j][i] - 1]));
                         if (mask[j][i] < 6) {
+                            //Setting game limit by bricks count
                             maxDeletedBricks++;
                         }
                     }
@@ -197,17 +220,33 @@ public class GameController implements Runnable {
     }
 
     private void generatePlane() {
-        plane = new Plane(ballSpawnX - 25, ballSpawnY + 5, 50, 8);
+        plane = new Plane(ballSpawnX - Plane.PLANE_WIDTH / 2, ballSpawnY + PLANE_OFFSET);
     }
 
     private void checkGameOver() {
+        //Setting game over depending on game situation
         if (lives < 1) {
             gameOver = true;
-            gameOverMessage = "You Lose! All balls are lost!";
+            gameOverMessage = GAME_LOST;
         } else if (deletedBricks == maxDeletedBricks) {
             gameOver = true;
-            gameOverMessage = "You Win! All bricks are destroyed!";
+            gameOverMessage = GAME_WON;
         }
+    }
+
+    private void checkScore() {
+        int score = 0;
+        int deletedBricks = 0;
+        for (Map.Entry<Pair<Integer, Integer>, Brick> brick : bricks.entrySet()) {
+            if (!brick.getValue().isIndestructible() && brick.getValue().getBrickHealth() <= 0) {
+                brick.getValue().setVisible(false);
+                score += brick.getValue().getPoints() * lives / maxLives * speed;
+                deletedBricks++;
+                bricks.remove(brick.getKey(), brick.getValue());
+            }
+        }
+        this.score += score;
+        this.deletedBricks += deletedBricks;
     }
 
     @Override
@@ -215,10 +254,13 @@ public class GameController implements Runnable {
         do {
             if (!gameOver) {
                 if (!isPlaying) {
+                    //Freezing balls while game is paused
+                    //TIME IS NOT PAUSED, THIS IS A FEATURE
                     for (Ball ball : balls) {
                         ball.setFrozen(true);
                     }
                 } else {
+                    //Counting balls in game
                     int aliveBalls = 0;
                     for (Ball ball : balls) {
                         ball.setFrozen(false);
@@ -227,16 +269,19 @@ public class GameController implements Runnable {
                         }
                     }
                     lives = aliveBalls;
+                    checkScore();
                     checkGameOver();
 
                 }
             } else {
+                //killing threads
                 for (Thread ball : ballThreads) {
                     ball.interrupt();
                 }
                 return;
             }
             try {
+                //delay depends on ball speed
                 Thread.sleep((long) (balls.get(0).getSpeed() * Ball.SPEED_MULTIPLIER));
             } catch (InterruptedException e) {
                 for (Thread ball : ballThreads) {

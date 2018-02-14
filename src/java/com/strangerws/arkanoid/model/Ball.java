@@ -2,33 +2,40 @@ package com.strangerws.arkanoid.model;
 
 import javafx.scene.paint.Color;
 import javafx.scene.shape.Circle;
+import javafx.util.Pair;
 
-import java.util.List;
+import java.util.Map;
 
 public class Ball extends Circle implements Runnable {
 
+    //Some static constants
     private static final int TOP_LEFT_X = 0;
     private static final int TOP_LEFT_Y = 0;
     private static final int OVERLAP = 4;
     private static final int RADIUS = 4;
     public static final int SPEED_MULTIPLIER = 100;
 
+    //Ball properties
     private double angle;
     private double speed;
-    private double worldWidth;
-    private double worldHeight;
+    private double hitboxX;
+    private double hitboxY;
+    private double width;
+    private double height;
     private boolean isFrozen;
     private boolean isAiming;
 
-    private List<List<Brick>> bricks;
+    //Other objects of world
+    //it`s not good to be honest, but i couldn`t see another way to use it with threads
+    private Map<Pair<Integer, Integer>, Brick> bricks;
     private Plane plane;
 
-    private double hitboxX;
-    private double hitboxY;
+    //Properties of a world
+    private double worldWidth;
+    private double worldHeight;
 
-    private double width;
-    private double height;
-
+    //getter and setters, as usual
+    //--------------------------------------------------------------
     public double getSpeed() {
         return speed;
     }
@@ -49,11 +56,11 @@ public class Ball extends Circle implements Runnable {
         return height;
     }
 
-    public double getAngle() {
+    private double getAngle() {
         return angle;
     }
 
-    public void setAngle(double angle) {
+    private void setAngle(double angle) {
         this.angle = angle;
     }
 
@@ -73,7 +80,9 @@ public class Ball extends Circle implements Runnable {
         isAiming = aiming;
     }
 
-    public Ball(double x, double y, List<List<Brick>> bricks, Plane plane, double speed, double angle, double worldWidth, double worldHeight) {
+    //--------------------------------------------------------------
+
+    public Ball(double x, double y, Map<Pair<Integer, Integer>, Brick> bricks, Plane plane, double speed, double angle, double worldWidth, double worldHeight) {
         super(x, y, RADIUS, Color.RED);
         this.hitboxX = x - getRadius();
         this.hitboxY = y - getRadius();
@@ -93,6 +102,8 @@ public class Ball extends Circle implements Runnable {
 
 
     private void move() {
+        //moving actual ball and its canvas interpretation
+        //while plane is released balls and game isn`t paused
         if (!isFrozen && !isAiming) {
             setCenterX(getCenterX() + speed * Math.cos(angle));
             setCenterY(getCenterY() + speed * Math.sin(angle));
@@ -102,90 +113,81 @@ public class Ball extends Circle implements Runnable {
     }
 
     public boolean isLost() {
+        //ball got through the plane, and we couldn`t catch it
+        //this method is used to stop thread
         return getCenterY() + getRadius() >= worldHeight;
     }
 
     public void moveWithPlane(double planeX) {
+        //changing x coordinate depending on plane
         setCenterX(planeX);
         hitboxX = getCenterX() - getRadius();
     }
 
-    private boolean intersectDown(Brick brick) {
-        if (getBoundsInLocal().intersects(brick.getX(), brick.getY() + brick.getHeight() - OVERLAP, brick.getWidth(), OVERLAP)) {
-            horizontalReflection();
-            System.out.println(Thread.currentThread().getName() + " reflected from " + brick.getX() + " " + brick.getY());
-            return true;
-        }
-        return false;
-    }
-
-    private boolean intersectUp(Brick brick) {
-        if (getBoundsInLocal().intersects(brick.getX(), brick.getY(), brick.getWidth(), OVERLAP)) {
-            horizontalReflection();
-            System.out.println(Thread.currentThread().getName() + " reflected from " + brick.getX() + " " + brick.getY());
-            return true;
-        }
-        return false;
-    }
-
-    private boolean intersectLeft(Brick brick) {
-        if (getBoundsInLocal().intersects(brick.getX(), brick.getY(), OVERLAP, brick.getHeight())) {
-            System.out.println(Thread.currentThread().getName() + " reflected from " + brick.getX() + " " + brick.getY());
-            verticalReflection();
-            return true;
-        }
-        return false;
-    }
-
-    private boolean intersectRight(Brick brick) {
-        if (getBoundsInLocal().intersects(brick.getX() + brick.getWidth() - OVERLAP, brick.getY(), OVERLAP, brick.getHeight())) {
-            verticalReflection();
-            System.out.println(Thread.currentThread().getName() + " reflected from " + brick.getX() + " " + brick.getY());
-            return true;
-        }
-        return false;
-    }
-
     private void horizontalReflection() {
         setAngle(-getAngle());
-        System.out.println(angle);
     }
 
     private void verticalReflection() {
         double angle = (getAngle() < 0) ? Math.PI - getAngle() : -Math.PI - getAngle();
         setAngle(angle);
-        System.out.println(angle);
     }
 
     private void checkBorderReflections() {
+        //Just reflections from borders of screen and plane
         if (getBoundsInLocal().intersects(TOP_LEFT_X, -OVERLAP, worldWidth, OVERLAP)) {
-            System.out.println(Thread.currentThread().getName() + " reflected from ceiling");
             horizontalReflection();
         }
         if (getBoundsInLocal().intersects(worldWidth, TOP_LEFT_Y, OVERLAP, worldHeight)) {
-            System.out.println(Thread.currentThread().getName() + " reflected from right wall");
             verticalReflection();
         }
         if (getBoundsInLocal().intersects(-OVERLAP, TOP_LEFT_Y, OVERLAP, worldHeight)) {
-            System.out.println(Thread.currentThread().getName() + " reflected from left wall");
             verticalReflection();
         }
         if (getBoundsInLocal().intersects(plane.getLayoutBounds())) {
-            System.out.println(Thread.currentThread().getName() + " reflected from plane");
             horizontalReflection();
         }
     }
 
-    private void checkBrickReflections() {
-        for (List<Brick> b : bricks) {
-            for (Brick brick : b) {
-                // this code must be in controller, but it is here because ball needs to reflect itself in its own thread
-                if (intersectLeft(brick) || intersectRight(brick) || intersectUp(brick) || intersectDown(brick)) {
-                    if (!brick.isIndestructible()) {
-                        brick.decreaseHealth();
-                    }
-                }
+    private void checkBrickReflection() {
+        //To speed up calculations we are using ConcurrentHashMap
+        //Map is better then previously used ArrayList
+        //because we can get any brick by key - Pair of integers
+        //and we don`t need to iterate by whole structure of bricks
+        //like it was in previous version
+        double nextX = getCenterX() + speed * Math.cos(angle);
+        double nextY = getCenterY() + speed * Math.sin(angle);
+
+        double nextVelocityX = nextX % Brick.BRICK_WIDTH;
+        double nextVelocityY = nextY % Brick.BRICK_HEIGHT;
+
+        //Getting coordinates of brick that we are intersecting in the next move
+        double brickX = nextX - nextVelocityX;
+        double brickY = nextY - nextVelocityY;
+
+        Brick brick = bricks.get(new Pair<>((int) brickX, (int) brickY));
+
+        //There are may be null brick, because we just get points of grid 32*16
+        //So, if vector of a ball is in brick
+        if (brick != null && brick.getBoundsInLocal().contains(nextX, nextY)) {
+            //Then we are checking vector of a ball
+            //If ball gets further by x then by y
+            if (nextVelocityX > nextVelocityY){
+                //Change it`s vector by x
+                horizontalReflection();
+            } else {
+                //if ball gets further by y change vector by y
+                verticalReflection();
             }
+
+            if (!brick.isIndestructible()) {
+                //Decreasing health of a brick if it can be broken
+                brick.decreaseHealth();
+            }
+            //That method isn`t perfect, because sometimes
+            //ball dives into the brick - this is visually bad
+            //Also, this method cannot resolve some complex problems
+            //like intersecting a border of two different bricks
         }
     }
 
@@ -193,11 +195,13 @@ public class Ball extends Circle implements Runnable {
     public void run() {
         do {
             if (!isLost() || !isFrozen) {
-                move();
                 checkBorderReflections();
-                checkBrickReflections();
+                checkBrickReflection();
+                move();
             } else return;
             try {
+                //Speed of a game depends on this sleep method
+                //To make a delay at maximum (10) speed subtract 1
                 Thread.sleep((long) (SPEED_MULTIPLIER - (speed - 1) * 10));
             } catch (InterruptedException e) {
                 return;
