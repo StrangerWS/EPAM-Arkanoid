@@ -18,7 +18,11 @@ import javafx.scene.input.KeyCode;
 import javafx.scene.layout.Pane;
 import javafx.scene.paint.Color;
 
+import java.text.SimpleDateFormat;
+import java.util.Calendar;
+import java.util.Date;
 import java.util.List;
+import java.util.Locale;
 
 public class ViewController {
 
@@ -44,12 +48,12 @@ public class ViewController {
     @FXML
     private ChoiceBox<Integer> speedInput;
 
+    //Canvas Rendering Objects
     private AnimationTimer timer;
-
     private GraphicsContext gc;
     private Canvas canvas;
 
-    //
+    //Game Properties
     private double angleBoundMin;
     private double angleBoundMax;
     private int lives;
@@ -90,7 +94,6 @@ public class ViewController {
             initializeGraphics();
             initializeGameScreen();
             gameThread = new Thread(game);
-            gameThread.setDaemon(true);
             game.setPlaying(true);
             timer.start();
             gameThread.start();
@@ -98,8 +101,9 @@ public class ViewController {
             disableControls();
             pauseBtn.setDisable(false);
         } else {
-            disposeGame();
             game.setGameOver(true);
+            gameThread.interrupt();
+            disposeGame();
             playBtn.setText("Play");
             pauseBtn.setDisable(true);
             enableControls();
@@ -148,7 +152,6 @@ public class ViewController {
         game.setPlaying(true);
 
         windowGame.getChildren().add(plane);
-        //windowGame.getChildren().addAll(balls);
         for (List<Brick> b : bricks) {
             for (Brick brick : b) {
                 windowGame.getChildren().addAll(brick);
@@ -161,15 +164,55 @@ public class ViewController {
         gc = canvas.getGraphicsContext2D();
         windowGame.getChildren().add(canvas);
 
+        Date date = new Date();
         timer = new AnimationTimer() {
             @Override
             public void handle(long now) {
+                //Time calculating
+                Calendar date2 = Calendar.getInstance();
+                long seconds = date2.getTime().getTime() - date.getTime();
+                SimpleDateFormat gameTime = new SimpleDateFormat("mm:ss", Locale.getDefault());
+                timeLabel.setText("Time: " + gameTime.format(seconds));
+
+                //Rendering balls on canvas (used to get rid of visual bugs)
                 gc.clearRect(0, 0, windowGame.getWidth(), windowGame.getHeight());
                 gc.setFill(Color.YELLOWGREEN);
                 gc.fillRect(0, 0, windowGame.getWidth(), windowGame.getHeight());
                 renderBalls();
+                checkBricks();
+
+                //Printing labels
+                if (game.isPlaying()) {
+                    scoreLabel.setText("Score: " + game.getScore());
+                    livesLabel.setText("Lives: " + game.getLives());
+                }
+
+                if (game.isGameOver()) {
+                    game.setGameOver(true);
+                    gameThread.interrupt();
+                    disposeGame();
+                    playBtn.setText("Play");
+                    pauseBtn.setDisable(true);
+                    enableControls();
+                    timer.stop();
+                    showDialogGameOver();
+                }
             }
         };
+    }
+
+    private void checkBricks() {
+        int score = 0;
+        for (List<Brick> b : bricks) {
+            for (Brick brick : b) {
+                if (!brick.isIndestructible() && brick.getBrickHealth() <= 0) {
+                    brick.setVisible(false);
+                    b.remove(brick);
+                    score += brick.getPoints();
+                }
+            }
+        }
+        game.setScore(game.getScore() + score);
     }
 
     private void renderBalls() {
@@ -195,7 +238,7 @@ public class ViewController {
             if (game.isPlaying()) {
                 plane.movePlane(plane.getX() + deltaX, windowGame.getWidth());
                 for (Ball ball : balls) {
-                    if (ball.isFrozen())
+                    if (ball.isAiming())
                         ball.moveWithPlane(plane.getX() + plane.getWidth() / 2);
                 }
                 mousePosition.set(new Point2D(event.getSceneX(), event.getSceneY()));
@@ -205,8 +248,8 @@ public class ViewController {
         windowGame.getScene().setOnKeyPressed(e -> {
             if (e.getCode() == KeyCode.W) {
                 for (Ball ball : balls) {
-                    if (ball.isFrozen()) {
-                        ball.start();
+                    if (ball.isAiming()) {
+                        ball.setAiming(false);
                     } else {
                         pauseBtnPressed();
                     }

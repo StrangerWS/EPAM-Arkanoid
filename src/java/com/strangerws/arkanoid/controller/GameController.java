@@ -21,11 +21,10 @@ public class GameController implements Runnable {
     private int maxScore;
     private boolean isPlaying;
     private boolean gameOver;
-    private Thread counterThread;
 
     private List<Ball> balls;
     private Thread[] ballThreads;
-    private List<List<Brick>> bricks;
+    private final List<List<Brick>> bricks = new CopyOnWriteArrayList<>();
     private Plane plane;
 
     private double angleBoundMin;
@@ -82,10 +81,6 @@ public class GameController implements Runnable {
         return bricks;
     }
 
-    public void setBricks(List<List<Brick>> bricks) {
-        this.bricks = bricks;
-    }
-
     public Plane getPlane() {
         return plane;
     }
@@ -135,10 +130,9 @@ public class GameController implements Runnable {
         ballSpawnX = worldWidth / 2;
         ballSpawnY = worldHeight - 60;
 
-        generateCounter();
-        generateBalls(speed);
         generateBricks();
         generatePlane();
+        generateBalls(speed);
 
         isPlaying = false;
     }
@@ -153,30 +147,22 @@ public class GameController implements Runnable {
         }
     }
 
-    private void generateCounter() {
-        Thread counterThread = new Thread(new Counter());
-        counterThread.setDaemon(true);
-        counterThread.start();
-    }
-
     private void generateBalls(int speed) {
         balls = new CopyOnWriteArrayList<>();
         double angle = angleBoundMin;
         for (int i = 0; i < lives; i++) {
             if (angleBoundMax != angleBoundMin)
                 angle = ThreadLocalRandom.current().nextDouble(angleBoundMin, angleBoundMax);
-            balls.add(new Ball(ballSpawnX, ballSpawnY, speed, angle, worldWidth, worldHeight));
+            balls.add(new Ball(ballSpawnX, ballSpawnY, bricks, plane, speed, angle, worldWidth, worldHeight));
         }
         ballThreads = new Thread[lives];
         for (int i = 0; i < lives; i++) {
             ballThreads[i] = new Thread(balls.get(i));
-            ballThreads[i].setDaemon(true);
             ballThreads[i].start();
         }
     }
 
     private void generateBricks() {
-        bricks = new CopyOnWriteArrayList<>();
         int[][] mask;
         try {
             mask = new Reader().readBrickArray();
@@ -198,48 +184,52 @@ public class GameController implements Runnable {
         plane = new Plane(ballSpawnX - 25, ballSpawnY + 5, 50, 8);
     }
 
-    private void checkReflections() {
-        if (maxScore == score) gameOver = true;
-        gameOverMessage = "You Win! All bricks are destroyed!";
-        for (Ball ball : balls) {
-            ball.checkBorderReflections(plane);
-
-            for (List<Brick> b : bricks)
-                for (Brick brick : b) {
-                    if (ball.checkBrickReflections(brick) && !brick.isIndestructible()) {
-                        brick.decreaseHealth();
-                    }
-
-                    if (!brick.isIndestructible() && brick.getBrickHealth() <= 0) {
-                        brick.setVisible(false);
-                        b.remove(brick);
-                        score += brick.getPoints();
-                    }
-                }
+    private void checkGameOver() {
+        if (lives < 1) {
+            gameOver = true;
+            gameOverMessage = "You Lose! All balls are lost!";
+        } else if (maxScore == score) {
+            gameOver = true;
+            gameOverMessage = "You Win! All bricks are destroyed!";
         }
     }
 
     @Override
     public void run() {
-        while (!gameOver) {
-            if (isPlaying) {
-                for (int i = 0; i < balls.size(); i++) {
-                    if (ballThreads[i].isInterrupted()) {
-                        ballThreads[i].start();
+        System.out.println("This thread is " + Thread.currentThread().getName());
+        do {
+            if (!gameOver) {
+                if (!isPlaying) {
+                    for (Ball ball : balls) {
+                        ball.setFrozen(true);
                     }
-                }
-                checkReflections();
-                try {
-                    Thread.sleep((long) (balls.get(0).getSpeed() * 10));
-                } catch (InterruptedException e) {
-                    e.printStackTrace();
+                } else {
+                    int aliveBalls = 0;
+                    for (Ball ball : balls) {
+                        ball.setFrozen(false);
+                        if (!ball.isLost()) {
+                            aliveBalls++;
+                        }
+                    }
+                    lives = aliveBalls;
+                    checkGameOver();
+
                 }
             } else {
-                for (Thread ballThread : ballThreads) {
-                    if (!ballThread.isInterrupted()) ballThread.interrupt();
+                for (Thread ball : ballThreads) {
+                    ball.interrupt();
                 }
-                counterThread.interrupt();
+                return;
             }
-        }
+            try {
+                Thread.sleep((long) (balls.get(0).getSpeed() * 10));
+            } catch (InterruptedException e) {
+                for (Thread ball : ballThreads) {
+                    ball.interrupt();
+                }
+                return;
+            }
+
+        } while (true);
     }
 }

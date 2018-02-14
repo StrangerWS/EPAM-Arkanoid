@@ -12,6 +12,10 @@ public class Ball extends Circle implements Runnable {
     private double worldWidth;
     private double worldHeight;
     private boolean isFrozen;
+    private boolean isAiming;
+
+    private List<List<Brick>> bricks;
+    private Plane plane;
 
     private double hitboxX;
     private double hitboxY;
@@ -47,7 +51,6 @@ public class Ball extends Circle implements Runnable {
         this.angle = angle;
     }
 
-
     public boolean isFrozen() {
         return isFrozen;
     }
@@ -56,10 +59,22 @@ public class Ball extends Circle implements Runnable {
         this.isFrozen = frozen;
     }
 
-    public Ball(double x, double y, double speed, double angle, double worldWidth, double worldHeight) {
+    public boolean isAiming() {
+        return isAiming;
+    }
+
+    public void setAiming(boolean aiming) {
+        isAiming = aiming;
+    }
+
+    public Ball(double x, double y, List<List<Brick>> bricks, Plane plane, double speed, double angle, double worldWidth, double worldHeight) {
         super(x, y, 4, Color.RED);
         this.hitboxX = x - getRadius();
         this.hitboxY = y - getRadius();
+
+        this.plane = plane;
+        this.bricks = bricks;
+
         this.width = getRadius() * 2;
         this.height = getRadius() * 2;
         this.speed = speed;
@@ -70,11 +85,12 @@ public class Ball extends Circle implements Runnable {
         this.worldWidth = worldWidth;
         this.worldHeight = worldHeight;
         this.isFrozen = true;
+        this.isAiming = true;
     }
 
 
     public void move() {
-        if (!isFrozen) {
+        if (!isFrozen && !isAiming) {
             setCenterX(getCenterX() + speed * Math.cos(angle));
             setCenterY(getCenterY() + speed * Math.sin(angle));
             this.hitboxX = getCenterX() - getRadius();
@@ -82,16 +98,8 @@ public class Ball extends Circle implements Runnable {
         }
     }
 
-    public void start() {
-        setAngle(angle);
-        isFrozen = false;
-    }
-
     public boolean isLost() {
-        if (getCenterY() + getRadius() >= worldHeight) {
-            return true;
-        }
-        return false;
+        return getCenterY() + getRadius() >= worldHeight;
     }
 
     public void moveWithPlane(double planeX) {
@@ -99,29 +107,29 @@ public class Ball extends Circle implements Runnable {
         hitboxX = getCenterX() - getRadius();
     }
 
-    public boolean intersectUpDown(Brick brick) {
+    private boolean intersectUpDown(Brick brick) {
         if (getBoundsInLocal().intersects(brick.getX(), brick.getY() + brick.getHeight() - 2, brick.getWidth(), 2)) {
             horizontalReflection();
-            System.out.println("reflected from " + brick.getX() + " " + brick.getY());
+            System.out.println(Thread.currentThread().getName() + " reflected from " + brick.getX() + " " + brick.getY());
             return true;
         }
         if (getBoundsInLocal().intersects(brick.getX(), brick.getY(), brick.getWidth(), 2)) {
             horizontalReflection();
-            System.out.println("reflected from " + brick.getX() + " " + brick.getY());
+            System.out.println(Thread.currentThread().getName() + " reflected from " + brick.getX() + " " + brick.getY());
             return true;
         }
         return false;
     }
 
-    public boolean intersectLeftRight(Brick brick) {
+    private boolean intersectLeftRight(Brick brick) {
         if (getBoundsInLocal().intersects(brick.getX(), brick.getY(), 2, brick.getHeight())) {
-            System.out.println("reflected from " + brick.getX() + " " + brick.getY());
+            System.out.println(Thread.currentThread().getName() + " reflected from " + brick.getX() + " " + brick.getY());
             verticalReflection();
             return true;
         }
         if (getBoundsInLocal().intersects(brick.getX() + brick.getWidth() - 2, brick.getY(), 2, brick.getHeight())) {
             verticalReflection();
-            System.out.println("reflected from " + brick.getX() + " " + brick.getY());
+            System.out.println(Thread.currentThread().getName() + " reflected from " + brick.getX() + " " + brick.getY());
             return true;
         }
         return false;
@@ -129,51 +137,59 @@ public class Ball extends Circle implements Runnable {
 
     private void horizontalReflection() {
         setAngle(-getAngle());
+        System.out.println(angle);
     }
 
     private void verticalReflection() {
         double angle = (getAngle() < 0) ? Math.PI - getAngle() : -Math.PI - getAngle();
+        System.out.println(angle);
         setAngle(angle);
     }
 
-    public void checkBorderReflections(Plane plane){
+    private void checkBorderReflections() {
         if (getBoundsInLocal().intersects(0, -2, worldWidth, 2)) {
-            System.out.println("reflected from ceiling");
+            System.out.println(Thread.currentThread().getName() + " reflected from ceiling");
             horizontalReflection();
         }
         if (getBoundsInLocal().intersects(worldWidth, 0, 2, worldHeight)) {
-            System.out.println("reflected from right wall");
+            System.out.println(Thread.currentThread().getName() + " reflected from right wall");
             verticalReflection();
         }
         if (getBoundsInLocal().intersects(-2, 0, 2, worldHeight)) {
-            System.out.println("reflected from left wall");
+            System.out.println(Thread.currentThread().getName() + " reflected from left wall");
             verticalReflection();
         }
         if (getBoundsInLocal().intersects(plane.getLayoutBounds())) {
-            System.out.println("reflected from plane");
+            System.out.println(Thread.currentThread().getName() + " reflected from plane");
             horizontalReflection();
         }
     }
 
-    public boolean checkBrickReflections(Brick brick) {
-        if (intersectLeftRight(brick)){
-            return true;
+    private void checkBrickReflections() {
+        for (List<Brick> b : bricks) {
+            for (Brick brick : b) {
+                // this code must be in controller, but it is here because ball needs to reflect itself in its own thread
+                if (intersectLeftRight(brick) || intersectUpDown(brick) && !brick.isIndestructible()) {
+                    brick.decreaseHealth();
+                }
+            }
         }
-        if (intersectUpDown(brick)){
-            return true;
-        }
-        return false;
     }
 
     @Override
     public void run() {
-        while (!isLost()) {
-            move();
+        do {
+            if (!isLost() || !isFrozen) {
+                move();
+                checkBorderReflections();
+                checkBrickReflections();
+            } else return;
             try {
                 Thread.sleep((long) speed * 10);
             } catch (InterruptedException e) {
-                e.printStackTrace();
+                return;
             }
         }
+        while (true);
     }
 }
