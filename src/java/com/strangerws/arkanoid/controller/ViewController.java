@@ -95,6 +95,7 @@ public class ViewController {
             initializeGameScreen();
             gameThread = new Thread(game);
             game.setPlaying(true);
+            gameThread.setDaemon(true);
             timer.start();
             gameThread.start();
             playBtn.setText("Stop");
@@ -203,16 +204,19 @@ public class ViewController {
 
     private void checkBricks() {
         int score = 0;
+        int deletedBricks = 0;
         for (List<Brick> b : bricks) {
             for (Brick brick : b) {
                 if (!brick.isIndestructible() && brick.getBrickHealth() <= 0) {
                     brick.setVisible(false);
+                    score += brick.getPoints() * game.getLives() / livesInput.getValue() * speedInput.getValue();
+                    deletedBricks++;
                     b.remove(brick);
-                    score += brick.getPoints();
                 }
             }
         }
         game.setScore(game.getScore() + score);
+        game.setDeletedBricks(game.getDeletedBricks() + deletedBricks);
     }
 
     private void renderBalls() {

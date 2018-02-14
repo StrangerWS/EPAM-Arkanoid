@@ -5,7 +5,6 @@ import com.strangerws.arkanoid.model.Brick;
 import com.strangerws.arkanoid.model.Plane;
 import com.strangerws.arkanoid.reader.Reader;
 import com.strangerws.arkanoid.util.BrickType;
-import com.strangerws.arkanoid.util.Counter;
 
 import java.io.IOException;
 import java.net.URISyntaxException;
@@ -18,13 +17,14 @@ public class GameController implements Runnable {
 
     private int lives;
     private int score;
-    private int maxScore;
+    private int deletedBricks;
+    private int maxDeletedBricks;
     private boolean isPlaying;
     private boolean gameOver;
 
     private List<Ball> balls;
-    private Thread[] ballThreads;
-    private final List<List<Brick>> bricks = new CopyOnWriteArrayList<>();
+    private List<Thread> ballThreads;
+    private List<List<Brick>> bricks;
     private Plane plane;
 
     private double angleBoundMin;
@@ -53,12 +53,20 @@ public class GameController implements Runnable {
         this.score = score;
     }
 
-    public int getMaxScore() {
-        return maxScore;
+    public int getDeletedBricks() {
+        return deletedBricks;
     }
 
-    public void setMaxScore(int maxScore) {
-        this.maxScore = maxScore;
+    public void setDeletedBricks(int deletedBricks) {
+        this.deletedBricks = deletedBricks;
+    }
+
+    public int getMaxDeletedBricks() {
+        return maxDeletedBricks;
+    }
+
+    public void setMaxDeletedBricks(int maxDeletedBricks) {
+        this.maxDeletedBricks = maxDeletedBricks;
     }
 
     public String getGameOverMessage() {
@@ -79,6 +87,10 @@ public class GameController implements Runnable {
 
     public List<List<Brick>> getBricks() {
         return bricks;
+    }
+
+    public void setBricks(List<List<Brick>> bricks) {
+        this.bricks = bricks;
     }
 
     public Plane getPlane() {
@@ -155,14 +167,16 @@ public class GameController implements Runnable {
                 angle = ThreadLocalRandom.current().nextDouble(angleBoundMin, angleBoundMax);
             balls.add(new Ball(ballSpawnX, ballSpawnY, bricks, plane, speed, angle, worldWidth, worldHeight));
         }
-        ballThreads = new Thread[lives];
+        ballThreads = new CopyOnWriteArrayList<>();
         for (int i = 0; i < lives; i++) {
-            ballThreads[i] = new Thread(balls.get(i));
-            ballThreads[i].start();
+            ballThreads.add(new Thread(balls.get(i)));
+            ballThreads.get(i).setDaemon(true);
+            ballThreads.get(i).start();
         }
     }
 
     private void generateBricks() {
+        bricks = new CopyOnWriteArrayList<>();
         int[][] mask;
         try {
             mask = new Reader().readBrickArray();
@@ -171,7 +185,9 @@ public class GameController implements Runnable {
                 for (int j = 0; j < mask[i].length; j++) {
                     if (mask[j][i] > 0) {
                         bricks.get(i).add(new Brick(i * Brick.BRICK_WIDTH, j * Brick.BRICK_HEIGHT, BrickType.values()[mask[j][i] - 1]));
-                        maxScore += BrickType.values()[mask[j][i] - 1].points;
+                        if (mask[j][i] < 6) {
+                            maxDeletedBricks++;
+                        }
                     }
                 }
             }
@@ -188,7 +204,7 @@ public class GameController implements Runnable {
         if (lives < 1) {
             gameOver = true;
             gameOverMessage = "You Lose! All balls are lost!";
-        } else if (maxScore == score) {
+        } else if (deletedBricks == maxDeletedBricks) {
             gameOver = true;
             gameOverMessage = "You Win! All bricks are destroyed!";
         }
@@ -196,7 +212,6 @@ public class GameController implements Runnable {
 
     @Override
     public void run() {
-        System.out.println("This thread is " + Thread.currentThread().getName());
         do {
             if (!gameOver) {
                 if (!isPlaying) {
@@ -222,7 +237,7 @@ public class GameController implements Runnable {
                 return;
             }
             try {
-                Thread.sleep((long) (balls.get(0).getSpeed() * 10));
+                Thread.sleep((long) (balls.get(0).getSpeed() * Ball.SPEED_MULTIPLIER));
             } catch (InterruptedException e) {
                 for (Thread ball : ballThreads) {
                     ball.interrupt();

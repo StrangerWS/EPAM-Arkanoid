@@ -7,6 +7,12 @@ import java.util.List;
 
 public class Ball extends Circle implements Runnable {
 
+    private static final int TOP_LEFT_X = 0;
+    private static final int TOP_LEFT_Y = 0;
+    private static final int OVERLAP = 4;
+    private static final int RADIUS = 4;
+    public static final int SPEED_MULTIPLIER = 100;
+
     private double angle;
     private double speed;
     private double worldWidth;
@@ -68,7 +74,7 @@ public class Ball extends Circle implements Runnable {
     }
 
     public Ball(double x, double y, List<List<Brick>> bricks, Plane plane, double speed, double angle, double worldWidth, double worldHeight) {
-        super(x, y, 4, Color.RED);
+        super(x, y, RADIUS, Color.RED);
         this.hitboxX = x - getRadius();
         this.hitboxY = y - getRadius();
 
@@ -78,9 +84,6 @@ public class Ball extends Circle implements Runnable {
         this.width = getRadius() * 2;
         this.height = getRadius() * 2;
         this.speed = speed;
-        if (angle == 90) {
-            angle++;
-        }
         this.angle = Math.toRadians(angle);
         this.worldWidth = worldWidth;
         this.worldHeight = worldHeight;
@@ -89,7 +92,7 @@ public class Ball extends Circle implements Runnable {
     }
 
 
-    public void move() {
+    private void move() {
         if (!isFrozen && !isAiming) {
             setCenterX(getCenterX() + speed * Math.cos(angle));
             setCenterY(getCenterY() + speed * Math.sin(angle));
@@ -107,13 +110,8 @@ public class Ball extends Circle implements Runnable {
         hitboxX = getCenterX() - getRadius();
     }
 
-    private boolean intersectUpDown(Brick brick) {
-        if (getBoundsInLocal().intersects(brick.getX(), brick.getY() + brick.getHeight() - 2, brick.getWidth(), 2)) {
-            horizontalReflection();
-            System.out.println(Thread.currentThread().getName() + " reflected from " + brick.getX() + " " + brick.getY());
-            return true;
-        }
-        if (getBoundsInLocal().intersects(brick.getX(), brick.getY(), brick.getWidth(), 2)) {
+    private boolean intersectDown(Brick brick) {
+        if (getBoundsInLocal().intersects(brick.getX(), brick.getY() + brick.getHeight() - OVERLAP, brick.getWidth(), OVERLAP)) {
             horizontalReflection();
             System.out.println(Thread.currentThread().getName() + " reflected from " + brick.getX() + " " + brick.getY());
             return true;
@@ -121,13 +119,26 @@ public class Ball extends Circle implements Runnable {
         return false;
     }
 
-    private boolean intersectLeftRight(Brick brick) {
-        if (getBoundsInLocal().intersects(brick.getX(), brick.getY(), 2, brick.getHeight())) {
+    private boolean intersectUp(Brick brick) {
+        if (getBoundsInLocal().intersects(brick.getX(), brick.getY(), brick.getWidth(), OVERLAP)) {
+            horizontalReflection();
+            System.out.println(Thread.currentThread().getName() + " reflected from " + brick.getX() + " " + brick.getY());
+            return true;
+        }
+        return false;
+    }
+
+    private boolean intersectLeft(Brick brick) {
+        if (getBoundsInLocal().intersects(brick.getX(), brick.getY(), OVERLAP, brick.getHeight())) {
             System.out.println(Thread.currentThread().getName() + " reflected from " + brick.getX() + " " + brick.getY());
             verticalReflection();
             return true;
         }
-        if (getBoundsInLocal().intersects(brick.getX() + brick.getWidth() - 2, brick.getY(), 2, brick.getHeight())) {
+        return false;
+    }
+
+    private boolean intersectRight(Brick brick) {
+        if (getBoundsInLocal().intersects(brick.getX() + brick.getWidth() - OVERLAP, brick.getY(), OVERLAP, brick.getHeight())) {
             verticalReflection();
             System.out.println(Thread.currentThread().getName() + " reflected from " + brick.getX() + " " + brick.getY());
             return true;
@@ -142,20 +153,20 @@ public class Ball extends Circle implements Runnable {
 
     private void verticalReflection() {
         double angle = (getAngle() < 0) ? Math.PI - getAngle() : -Math.PI - getAngle();
-        System.out.println(angle);
         setAngle(angle);
+        System.out.println(angle);
     }
 
     private void checkBorderReflections() {
-        if (getBoundsInLocal().intersects(0, -2, worldWidth, 2)) {
+        if (getBoundsInLocal().intersects(TOP_LEFT_X, -OVERLAP, worldWidth, OVERLAP)) {
             System.out.println(Thread.currentThread().getName() + " reflected from ceiling");
             horizontalReflection();
         }
-        if (getBoundsInLocal().intersects(worldWidth, 0, 2, worldHeight)) {
+        if (getBoundsInLocal().intersects(worldWidth, TOP_LEFT_Y, OVERLAP, worldHeight)) {
             System.out.println(Thread.currentThread().getName() + " reflected from right wall");
             verticalReflection();
         }
-        if (getBoundsInLocal().intersects(-2, 0, 2, worldHeight)) {
+        if (getBoundsInLocal().intersects(-OVERLAP, TOP_LEFT_Y, OVERLAP, worldHeight)) {
             System.out.println(Thread.currentThread().getName() + " reflected from left wall");
             verticalReflection();
         }
@@ -169,8 +180,10 @@ public class Ball extends Circle implements Runnable {
         for (List<Brick> b : bricks) {
             for (Brick brick : b) {
                 // this code must be in controller, but it is here because ball needs to reflect itself in its own thread
-                if (intersectLeftRight(brick) || intersectUpDown(brick) && !brick.isIndestructible()) {
-                    brick.decreaseHealth();
+                if (intersectLeft(brick) || intersectRight(brick) || intersectUp(brick) || intersectDown(brick)) {
+                    if (!brick.isIndestructible()) {
+                        brick.decreaseHealth();
+                    }
                 }
             }
         }
@@ -185,7 +198,7 @@ public class Ball extends Circle implements Runnable {
                 checkBrickReflections();
             } else return;
             try {
-                Thread.sleep((long) speed * 10);
+                Thread.sleep((long) (SPEED_MULTIPLIER - (speed - 1) * 10));
             } catch (InterruptedException e) {
                 return;
             }
