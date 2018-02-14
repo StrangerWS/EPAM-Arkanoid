@@ -10,6 +10,7 @@ public class Main extends Application {
 
     private static final String GAME_SCREEN_LOCATION = "/fxml/game.fxml";
     private static final String GAME_CSS_LOCATION = "/css/game.css";
+    private static final String TITLE_TEXT = "Arkanoid by StrangerWS";
     private final FXMLLoader loader = new FXMLLoader();
 
     @Override
@@ -20,7 +21,7 @@ public class Main extends Application {
 
         scene.getStylesheets().add(GAME_CSS_LOCATION);
 
-        primaryStage.setTitle("Arkanoid by StrangerWS");
+        primaryStage.setTitle(TITLE_TEXT);
         primaryStage.setScene(scene);
         primaryStage.resizableProperty().set(true);
         primaryStage.show();
